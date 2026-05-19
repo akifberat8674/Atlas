@@ -125,7 +125,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Akif: {kullanici_mesaji}
     Atlas:"""
     
-    response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
     cevap = response.text.strip()
     
     with open(HAFIZA_DOSYASI, "a") as f:
