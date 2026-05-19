@@ -6,7 +6,7 @@ import os
 
 # Ayarlar
 genai.configure(api_key="AIzaSyCIUgI7ksuMZiwfYl0t4TriWp4LpPBDn0k")
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 TOKEN = "8600728246:AAE5ICTLhfq4Zxy8yb_dD0CB0uG4DvlLZJg"
 HAFIZA_DOSYASI = "/root/atlas/konusmalar.txt"
 
