@@ -3,12 +3,18 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import google.generativeai as genai
 import os
+from dotenv import load_dotenv
 
-# Ayarlar
-genai.configure(api_key="AIzaSyCIUgI7ksuMZiwfYl0t4TriWp4LpPBDn0k")
-model = genai.GenerativeModel('gemini-2.5-flash')
-TOKEN = "8600728246:AAE5ICTLhfq4Zxy8yb_dD0CB0uG4DvlLZJg"
+# Gizli kasayı (.env) aç
+load_dotenv("/root/atlas/.env")
+
+# Şifreleri güvenli bir şekilde kasadan al
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 HAFIZA_DOSYASI = "/root/atlas/konusmalar.txt"
+
+# Gemini ayarları
+genai.configure(api_key=GEMINI_API_KEY)
 
 # Hafıza fonksiyonu
 def hafizayi_oku():
