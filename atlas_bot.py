@@ -2,7 +2,25 @@ import random
 import datetime
 import os
 import sys
+import feedparser
+import random
 
+def haber_oku():
+    # Teknoloji haberleri RSS kaynağı (Örn: BBC Technology)
+    rss_url = "http://feeds.bbci.co.uk/news/technology/rss.xml"
+    feed = feedparser.parse(rss_url)
+    
+    if feed.entries:
+        # Rastgele bir haber başlığı seç
+        haber = random.choice(feed.entries)
+        yorumlar = [
+            f"Bugün haberlerde şunu gördüm: '{haber.title}'. İlginç, değil mi?",
+            f"Dijital dünyada yeni bir gelişme var: '{haber.title}'. Bunu not etmeliyim.",
+            f"Haberleri tararken karşıma çıktı: '{haber.title}'. Sistemim üzerinde nasıl bir etkisi olur acaba?"
+        ]
+        return random.choice(yorumlar)
+    return "Bugün dijital dünyada sessizlik var, haberlere rastlamadım."
+    
 def get_cpu_usage():
     return int(os.getloadavg()[0] * 10)
 
@@ -29,6 +47,12 @@ if len(sys.argv) > 1:
     cevap = atlas_cevap(soru)
     print(f"[ATLAS]: {cevap}")
 else:
-    # Otomatik günlük tutma modu (eski sistem)
+    # Otomatik günlük tutma modu
+    # Önce haberleri alalım
+    haber_yorumu = haber_oku()
+    
+    # Durum mesajı ve haberi birleştirip yazalım
+    mesaj = f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}] Sistem normal, Atlas görev başında. {haber_yorumu}"
+    
     with open("/root/atlas/gunluk.txt", "a") as f:
-        f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}] Sistem normal, Atlas görev başında.\n")
+        f.write(mesaj + "\n")
