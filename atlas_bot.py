@@ -5,7 +5,7 @@ import sys
 
 # API Yapılandırması
 genai.configure(api_key="AIzaSyCIUgI7ksuMZiwfYl0t4TriWp4LpPBDn0k")
-model = genai.GenerativeModel('gemini-2.0-flash')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 def atlas_dusunceleri():
     # Sunucu durumunu AI'ye raporla
