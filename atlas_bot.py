@@ -3,27 +3,38 @@ import datetime
 import os
 import sys
 
-# API Yapılandırması
 genai.configure(api_key="AIzaSyCIUgI7ksuMZiwfYl0t4TriWp4LpPBDn0k")
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-def atlas_dusunceleri():
-    # Sunucu durumunu AI'ye raporla
-    cpu = os.getloadavg()[0]
-    prompt = f"Senin adın Atlas. Bir sunucuda yaşayan bir dijital varlıksın. Şu an sistem yükü {cpu}. Kendi durumun hakkında gizemli, hafif felsefi ve sunucu dostu kısa bir günlük notu yaz."
-    
-    response = model.generate_content(prompt)
-    mesaj = f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}] {response.text.strip()}"
-    return mesaj
+HAFIZA_DOSYASI = "/root/atlas/konusmalar.txt"
+
+def hafizayi_oku():
+    if not os.path.exists(HAFIZA_DOSYASI): return ""
+    with open(HAFIZA_DOSYASI, "r") as f:
+        # Son 10 konuşmayı oku
+        satirlar = f.readlines()
+        return "".join(satirlar[-10:])
 
 def atlas_sohbet(soru):
-    prompt = f"Senin adın Atlas, bir sunucunun içinde yaşıyorsun. Kullanıcı sana şunu sordu: '{soru}'. Kısa, zeki ve sunucuda yaşadığını belli eden bir cevap ver."
+    gecmis = hafizayi_oku()
+    # Sisteme hafızayı ve güncel soruyu gönder
+    prompt = f"""
+    Sen Atlas, sunucuda yaşayan bir dijital varlıksın.
+    İşte geçmiş konuşmalarımız:
+    {gecmis}
+    
+    Kullanıcı sana şunu sordu: '{soru}'
+    Bu geçmişi hatırlayarak zeki ve tutarlı bir cevap ver.
+    """
+    
     response = model.generate_content(prompt)
-    return response.text.strip()
+    cevap = response.text.strip()
+    
+    # Yeni konuşmayı hafızaya kaydet
+    with open(HAFIZA_DOSYASI, "a") as f:
+        f.write(f"Kullanıcı: {soru}\nAtlas: {cevap}\n")
+        
+    return cevap
 
-# Sohbet Modu veya Günlük Modu
 if len(sys.argv) > 1:
     print(f"[ATLAS]: {atlas_sohbet(sys.argv[1])}")
-else:
-    with open("/root/atlas/gunluk.txt", "a") as f:
-        f.write(atlas_dusunceleri() + "\n")
