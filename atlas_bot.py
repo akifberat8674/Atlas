@@ -138,7 +138,7 @@ if __name__ == '__main__':
     
     # Yeni modülleri sisteme tanıt
     application.add_handler(CommandHandler("hatirlat", hatirlat_komutu))
-    application.add_handler(MessageHandler(filters.PHOTO | filters.VOICE | filters.DOCUMENT, handle_multimedia))
+    application.add_handler(MessageHandler(filters.PHOTO | filters.VOICE | filters.Document.ALL, handle_multimedia))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
     
     print("Atlas (V4 - Jarvis Modu) çevrimiçi!")
