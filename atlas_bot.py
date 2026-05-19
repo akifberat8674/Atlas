@@ -59,7 +59,7 @@ async def handle_multimedia(update: Update, context: ContextTypes.DEFAULT_TYPE):
             yuklenen_medya = client.files.upload(file=gecici_yol)
             prompt = f"Sen Atlas'sın, Akif'in dijital asistanısın. Akif sana bir dosya/medya gönderdi. Talimatı: {talimat}"
             response = client.models.generate_content(
-                model='gemini-3-flash',
+                model='gemini-3-flash-preview',
                 contents=[yuklenen_medya, prompt]
             )
             await mesaj.reply_text(response.text.strip())
@@ -115,7 +115,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Akif: {kullanici_mesaji}
     Atlas:"""
     
-    response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
+    response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
     cevap = response.text.strip()
     
     with open(HAFIZA_DOSYASI, "a") as f:
