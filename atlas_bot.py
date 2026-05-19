@@ -15,6 +15,7 @@ HAFIZA_DOSYASI = "/root/atlas/konusmalar.txt"
 
 # Gemini ayarları
 genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # Hafıza fonksiyonu
 def hafizayi_oku():
