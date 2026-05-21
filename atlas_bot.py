@@ -140,4 +140,63 @@ async def handle_multimedia(update: Update, context: ContextTypes.DEFAULT_TYPE):
             prompt = f"Sen Atlas'sın, Akif'in asistanısın. Gönderilen medya talimatı: {talimat}"
             response = client.models.generate_content(model='gemini-3-flash-preview', contents=[yuklenen_medya, prompt])
             await mesaj.reply_text(response.text.strip())
-        except Exception as e: await mesaj.reply_text
+        except Exception as e: await mesaj.reply_text(f"🚨 Hata: {e}")
+        finally:
+            if os.path.exists(gecici_yol): os.remove(gecici_yol)
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kullanici_mesaji = update.message.text
+    if kullanici_mesaji.startswith("sudo-atlas "):
+        komut = kullanici_mesaji.replace("sudo-atlas ", "")
+        try:
+            sonuc = subprocess.run(komut, shell=True, capture_output=True, text=True, timeout=15)
+            await update.message.reply_text(f"💻 Terminal:\n\n{sonuc.stdout if sonuc.stdout else sonuc.stderr[:4000]}")
+        except Exception as e: await update.message.reply_text(f"🚨 Hata: {e}")
+        return
+    cevap = beyin_firtinasi(kullanici_mesaji, kaynak="Telegram")
+    await update.message.reply_text(cevap)
+
+# --- ANA TETİKLEYİCİ (İKİ MOTORU BİRDEN ÇALIŞTIRAN YAPI) ---
+async def main():
+    # 1. Web Sunucusunu Kur
+    app = web.Application()
+    
+    # CORS ayarları (Senin kendi web sitenin VDS'e veri sormasına izin verir)
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
+    })
+    
+    # Rotaları ekle
+    durum_resource = app.router.add_resource("/api/durum")
+    cors.add(durum_resource.add_route("GET", api_durum))
+    komut_resource = app.router.add_resource("/api/komut")
+    cors.add(komut_resource.add_route("POST", api_komut))
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080) # Atlas 8080 portundan webi dinliyor
+    await site.start()
+    print("🌐 Atlas Web API Aktif! (Port: 8080)")
+
+    # 2. Telegram Motorunu Kur
+    tg_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    tg_app.job_queue.run_repeating(otonom_inisiyatif_görevi, interval=7200, first=30)
+    tg_app.add_handler(CommandHandler("panel", pano_komutu))
+    tg_app.add_handler(MessageHandler(filters.PHOTO | filters.VOICE | filters.Document.ALL, handle_multimedia))
+    tg_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
+    
+    await tg_app.initialize()
+    await tg_app.start()
+    await tg_app.updater.start_polling()
+    print("🤖 Atlas Telegram Motoru Aktif!")
+
+    # Sonsuz döngü (Kapanmasını engeller)
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == '__main__':
+    asyncio.run(main())
