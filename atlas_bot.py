@@ -78,7 +78,7 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     Akif: {kullanici_mesaji}
     Atlas:"""
     
-    response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
+    response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
     cevap = response.text.strip()
     
     # 4. YENİ BİLGİYİ BEYNE KAZI (Sonsuza dek hatırlaması için vektör DB'ye ekle)
@@ -149,7 +149,7 @@ async def otonom_inisiyatif_görevi(context: ContextTypes.DEFAULT_TYPE):
     # Otonom mesaja sadece anlık durumu veriyoruz, uzun hafızaya gerek yok
     prompt = f"Sen Atlas'sın. Otonom bir asistan. Şu an saat {su_an}. CPU: %{cpu}, RAM: %{ram}. Akif'e kendi isteğinle bir mesaj yaz. Konu projeleriniz veya sunucu durumu olabilir. Doğal, kısa (1-2 cümle) ve alaycı bir giriş yap.\nAtlas'ın Otonom Mesajı:"
     try:
-        response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
         cevap = response.text.strip()
         
         # Otonom mesajı da hafızaya kazı
@@ -182,7 +182,7 @@ async def handle_multimedia(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             yuklenen_medya = client.files.upload(file=gecici_yol)
             prompt = f"Sen Atlas'sın, Akif'in asistanısın. Gönderilen medya talimatı: {talimat}. KURAL: Çok kısa ve net cevap ver."
-            response = client.models.generate_content(model='gemini-3-flash', contents=[yuklenen_medya, prompt])
+            response = client.models.generate_content(model='gemini-3-flash-preview', contents=[yuklenen_medya, prompt])
             cevap = response.text.strip()
             
             # Medya yorumunu da hafızaya al
