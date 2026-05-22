@@ -86,20 +86,26 @@ def execute_engineering_calculation(component, calculation_type, parameters_json
     except Exception as e:
         return {"hata": str(e)}
 
-def simulate_card_illusion(action, params_json):
-    """Sanal Deste Üzerinde Kart İllüzyon Simülasyonu Yapar (10-20 Algoritması gibi).
-    Action: 'deste-hazirla', 'kes', 'dagit', 'sirayi-kontol-et'.
-    Params_JSON: Gerekli parametreleri içeren JSON formatlı dize.
-    Örnek Deste Hazirla Parametreleri: {"renk": "mavi"} -> Rastgele deste hazırlar.
-    """
-    params = json.loads(params_json)
+def simulate_card_illusion(action, params_json="{}"):
     try:
-        if action == 'deste-hazirla':
-            deste = [f"{s}{v}" for s in ["K", "K", "M", "M"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
-            random.shuffle(deste)
-            return {"sonuc": f"52'lik {params.get('renk')} renk deste karıştırıldı.", "deste": deste[:10]}
+        # JSON parametreleri bazen boş veya hatalı gelebilir, güvenli okuyalım
+        try:
+            params = json.loads(params_json) if params_json else {}
+        except:
+            params = {}
             
-        return {"hata": "Bilinmeyen eylem."}
+        act = str(action).lower()
+        
+        # Eylem adını esnek yakala
+        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'ill' in act:
+            renk = params.get('renk', 'mavi')
+            # Şekilli kart destesi oluştur
+            deste = [f"{s}{v}" for s in ["♠", "♥", "♦", "♣"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
+            random.shuffle(deste)
+            
+            return {"sonuc": f"52'lik {renk} deste illüzyon testleri için karıştırıldı. Üstteki 5 kart: {', '.join(deste[:5])}"}
+            
+        return {"hata": f"Bilinmeyen kart eylemi: {action}"}
     except Exception as e:
         return {"hata": str(e)}
 
