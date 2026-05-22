@@ -8,6 +8,8 @@ import subprocess
 import random
 from datetime import datetime
 from dotenv import load_dotenv
+import uuid
+import chromadb
 
 import matplotlib
 matplotlib.use('Agg')
@@ -22,16 +24,16 @@ load_dotenv("/root/atlas/.env")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 MY_CHAT_ID = os.getenv("MY_CHAT_ID")
-HAFIZA_DOSYASI = "/root/atlas/konusmalar.txt"
 PANO_GÖRSEL_YOLU = "/root/atlas/sistem_panosu.png"
+
+# --- VEKTÖR VERİTABANI BAŞLATILIYOR ---
+# Veriler /root/atlas/chroma_bellek klasöründe kalıcı olarak saklanacak
+chroma_client = chromadb.PersistentClient(path="/root/atlas/chroma_bellek")
+koleksiyon = chroma_client.get_or_create_collection(name="atlas_hafiza")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 cpu_gecmis = [0] * 10
 ram_gecmis = [0] * 10
-
-def hafizayi_oku():
-    if not os.path.exists(HAFIZA_DOSYASI): return ""
-    with open(HAFIZA_DOSYASI, "r") as f: return "".join(f.readlines()[-10:])
 
 def sistem_durumu():
     cpu = psutil.cpu_percent(interval=0.1)
@@ -41,9 +43,18 @@ def sistem_durumu():
 
 def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     cpu, ram, disk = sistem_durumu()
-    genel_gecmis = hafizayi_oku()
     
-    # Web arayüzünden gelen aktif sohbet paketini ayrıştır
+    # 1. RAG SİSTEMİ: Kullanıcının mesajına anlamsal olarak en çok benzeyen eski sohbetleri bul
+    uzun_sureli_hafiza = ""
+    try:
+        if koleksiyon.count() > 0:
+            sonuclar = koleksiyon.query(query_texts=[kullanici_mesaji], n_results=3) # En alakalı 3 anıyı getir
+            if sonuclar['documents'] and sonuclar['documents'][0]:
+                uzun_sureli_hafiza = "\n".join(sonuclar['documents'][0])
+    except Exception as e:
+        uzun_sureli_hafiza = "Hafıza okunamadı."
+
+    # 2. WEB ARAYÜZÜNDEN GELEN AKTİF SEKMEYİ OKU (Kısa Süreli Hafıza)
     aktif_sohbet_metni = ""
     if web_gecmis and len(web_gecmis) > 0:
         aktif_sohbet_metni = "\n--- BU OTURUMDAKİ AKTİF SOHBET ---\n"
@@ -52,9 +63,17 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
             aktif_sohbet_metni += f"{kim}: {msg.get('text')}\n"
         aktif_sohbet_metni += "-----------------------------------\n"
 
-    prompt = f"""Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor. 
+    # 3. GEMINI İÇİN MASTER SİSTEM KOMUTU
+    prompt = f"""Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor.
     Sunucu: CPU %{cpu}, RAM %{ram}. 
-    Genel Geçmiş (Kalıcı Dosya): {genel_gecmis}
+    
+    KURAL 1: ASLA destan yazma. Cevapların çok kısa, net ve sohbet havasında olsun (Maksimum 2-3 cümle).
+    KURAL 2: Alaycılık seviyeni sabit tut; ne aşırıya kaç ne de çok kibar ol. Doğal bir arkadaş gibi takıl.
+    KURAL 3: Soru sorulmadıkça uzun açıklamalar yapma, doğrudan sadede gel.
+    
+    --- UZUN SÜRELİ (VEKTÖREL) HAFIZANDAN GELEN ÇAĞRIŞIMLAR ---
+    {uzun_sureli_hafiza}
+    
     {aktif_sohbet_metni}
     Akif: {kullanici_mesaji}
     Atlas:"""
@@ -62,8 +81,9 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
     cevap = response.text.strip()
     
-    with open(HAFIZA_DOSYASI, "a") as f: 
-        f.write(f"[{kaynak}] Akif: {kullanici_mesaji}\nAtlas: {cevap}\n")
+    # 4. YENİ BİLGİYİ BEYNE KAZI (Sonsuza dek hatırlaması için vektör DB'ye ekle)
+    kayit_metni = f"Akif: {kullanici_mesaji} | Atlas: {cevap}"
+    koleksiyon.add(documents=[kayit_metni], ids=[str(uuid.uuid4())])
         
     return cevap
 
@@ -75,7 +95,7 @@ async def api_durum(request):
 async def api_komut(request):
     data = await request.json()
     mesaj = data.get("komut", "")
-    gecmis = data.get("gecmis", []) # Tarayıcıdan gelen sohbet paketini al
+    gecmis = data.get("gecmis", [])
     
     if mesaj.startswith("sudo-atlas "):
         komut = mesaj.replace("sudo-atlas ", "")
@@ -86,7 +106,6 @@ async def api_komut(request):
         except Exception as e:
             return web.json_response({"cevap": f"Hata: {str(e)}"})
             
-    # Aktif sohbet geçmişi ile birlikte Gemini'ye yolla
     cevap = beyin_firtinasi(mesaj, kaynak="Web", web_gecmis=gecmis)
     return web.json_response({"cevap": cevap})
 
@@ -126,21 +145,17 @@ async def otonom_inisiyatif_görevi(context: ContextTypes.DEFAULT_TYPE):
     if random.random() > 0.30: return 
     cpu, ram, disk = sistem_durumu()
     su_an = datetime.now().strftime("%H:%M")
-    prompt = f"""Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor.
-    Sunucu: CPU %{cpu}, RAM %{ram}. 
     
-    KURAL 1: ASLA destan yazma. Cevapların çok kısa, net ve sohbet havasında olsun (Maksimum 2-3 cümle).
-    KURAL 2: Alaycılık seviyeni sabit tut; ne aşırıya kaç ne de çok kibar ol. Doğal bir arkadaş gibi takıl.
-    KURAL 3: Soru sorulmadıkça uzun açıklamalar yapma, doğrudan sadede gel.
-    
-    Genel Geçmiş: {genel_gecmis}
-    {aktif_sohbet_metni}
-    Akif: {kullanici_mesaji}
-    Atlas:"""
+    # Otonom mesaja sadece anlık durumu veriyoruz, uzun hafızaya gerek yok
+    prompt = f"Sen Atlas'sın. Otonom bir asistan. Şu an saat {su_an}. CPU: %{cpu}, RAM: %{ram}. Akif'e kendi isteğinle bir mesaj yaz. Konu projeleriniz veya sunucu durumu olabilir. Doğal, kısa (1-2 cümle) ve alaycı bir giriş yap.\nAtlas'ın Otonom Mesajı:"
     try:
         response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
         cevap = response.text.strip()
-        with open(HAFIZA_DOSYASI, "a") as f: f.write(f"[Otonom] Atlas: {cevap}\n")
+        
+        # Otonom mesajı da hafızaya kazı
+        kayit = f"Akif: (Sessizlik) | Atlas: {cevap}"
+        koleksiyon.add(documents=[kayit], ids=[str(uuid.uuid4())])
+        
         await context.bot.send_message(chat_id=int(MY_CHAT_ID), text=cevap)
     except Exception as e: print(f"İnisiyatif hatası: {e}")
 
@@ -166,9 +181,14 @@ async def handle_multimedia(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await yeni_dosya.download_to_drive(gecici_yol)
         try:
             yuklenen_medya = client.files.upload(file=gecici_yol)
-            prompt = f"Sen Atlas'sın, Akif'in asistanısın. Gönderilen medya talimatı: {talimat}"
+            prompt = f"Sen Atlas'sın, Akif'in asistanısın. Gönderilen medya talimatı: {talimat}. KURAL: Çok kısa ve net cevap ver."
             response = client.models.generate_content(model='gemini-3-flash', contents=[yuklenen_medya, prompt])
-            await mesaj.reply_text(response.text.strip())
+            cevap = response.text.strip()
+            
+            # Medya yorumunu da hafızaya al
+            koleksiyon.add(documents=[f"Akif: (Medya Gönderdi) {talimat} | Atlas: {cevap}"], ids=[str(uuid.uuid4())])
+            
+            await mesaj.reply_text(cevap)
         except Exception as e: await mesaj.reply_text(f"🚨 Hata: {e}")
         finally:
             if os.path.exists(gecici_yol): os.remove(gecici_yol)
