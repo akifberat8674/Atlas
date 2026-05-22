@@ -187,7 +187,7 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     ]
 
     try:
-        response = client.models.generate_content(model=MODEL_NAME, contents=prompt, tools=tools_config)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt, config=types.GenerateContentConfig(tools=tools_config))
         
         # 4. AGENTIC DÖNGÜ: Gemini fonksiyon çağırma isteği gönderdi mi?
         for part in response.candidates[0].content.parts:
