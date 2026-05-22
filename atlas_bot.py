@@ -46,10 +46,13 @@ ram_gecmis = [0] * 10
 
 # --- SİSTEM DURUMU MODÜLÜ ---
 def sistem_durumu():
-    cpu = psutil.cpu_percent(interval=0.1)
-    ram = psutil.virtual_memory().percent
-    disk = psutil.disk_usage('/').percent
-    return cpu, ram, disk
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+        ram = psutil.virtual_memory().percent
+        disk = psutil.disk_usage('/').percent
+        return cpu, ram, disk
+    except Exception:
+        return 0, 0, 0
 
 # ==============================================================================
 # ================== ATLAS'IN "AGENTIC" ALETLERİ (TOOLS) ==================
@@ -60,29 +63,26 @@ def sistem_durumu():
 # ==============================================================================
 
 def execute_engineering_calculation(component, calculation_type, parameters_json):
-    """Mühendislik ve Fizik Hesaplamaları Yapar.
-    Component: 'go-kart', 'scooter', 'motor', 'canlı-aks' gibi.
-    Calculation_Type: 'hiz-hesabi', 'disli-orani-stres', 'zincir-uzunlugu'.
-    Parameters_JSON: Gerekli parametreleri içeren JSON formatlı dize.
-    Örnek Hiz Hesabi Parametreleri: {"rpm": 3000, "tekerlek_capi_cm": 25, "disli_orani_motor": 12, "disli_orani_aks": 60}
-    """
-    params = json.loads(parameters_json)
     try:
-        if calculation_type == 'hiz-hesabi':
-            rpm = params.get('rpm')
-            teker_capi = params.get('tekerlek_capi_cm')
-            motor_disli = params.get('disli_orani_motor')
-            aks_disli = params.get('disli_orani_aks')
+        params = json.loads(parameters_json)
+        calc_type = str(calculation_type).lower()
+        
+        if 'hiz' in calc_type or 'hesab' in calc_type or 'speed' in calc_type:
+            rpm = float(params.get('rpm', 3000))
+            teker_capi = float(params.get('tekerlek_capi_cm', 25))
+            motor_disli = float(params.get('disli_orani_motor', 12))
+            aks_disli = float(params.get('disli_orani_aks', 60))
             
+            if motor_disli == 0: motor_disli = 1
             total_ratio = aks_disli / motor_disli
             aks_rpm = rpm / total_ratio
-            cevre = (teker_capi / 100) * constants.pi # Metre cinsinden çevre
+            cevre = (teker_capi / 100) * constants.pi
             hiz_m_dk = aks_rpm * cevre
             hiz_km_sa = (hiz_m_dk * 60) / 1000
             
-            return {"sonuc": f"{total_ratio:.2f} Dişli oranıyla Go-kart maks hızı {hiz_km_sa:.2f} km/sa."}
+            return {"sonuc": f"{total_ratio:.2f} dişli oranı ve {rpm} RPM ile Piranha motorlu aracın tahmini maks hızı: {hiz_km_sa:.2f} km/sa."}
             
-        return {"hata": "Bilinmeyen hesaplama türü."}
+        return {"hata": f"Bilinmeyen hesaplama türü: {calculation_type}"}
     except Exception as e:
         return {"hata": str(e)}
 
@@ -206,11 +206,17 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
                 elif function_name == "create_image_from_text":
                     tool_cevap = create_image_from_text(**part.function_call.args)
                 
-                # Aracı kullandığını hafızaya al
+               # Aracı kullandığını hafızaya al
                 kayit = f"Akif: (Araç Kullandı) {function_name} -> {args_json} | Atlas: {json.dumps(tool_cevap)}"
                 koleksiyon.add(documents=[kayit], ids=[str(uuid.uuid4())])
                 
-                return json.dumps(tool_cevap) # Aracı cevabını JSON olarak döndür
+                # JSON YERİNE OKUNABİLİR METİN DÖNDÜR
+                if "sonuc" in tool_cevap:
+                    return f"⚙️ **Sistem Hesaplaması:** {tool_cevap['sonuc']}"
+                elif "status" in tool_cevap:
+                    return f"🎨 **Görsel Stüdyo:** {tool_cevap['status']} (Yol: {tool_cevap.get('dosya_yolu','')})"
+                else:
+                    return f"🚨 **Araç Hatası:** {tool_cevap.get('hata', 'Bilinmeyen hata.')}"
                 
         # Fonksiyon çağrılmadıysa, normal metin cevabını döndür
         cevap = response.text.strip()
