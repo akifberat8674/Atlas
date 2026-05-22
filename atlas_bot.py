@@ -93,66 +93,96 @@ def simulate_card_illusion(action, params_json="{}"):
         except:
             params = {}
             
-        # Türkçe karakterleri temizleyip standartlaştırıyoruz (göster -> goster)
         act = str(action).lower().replace('ö', 'o').replace('ü', 'u').replace('ı', 'i').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g')
         dosya_yolu = "/root/atlas/gizli_deste.json"
+        secilen_yolu = "/root/atlas/secilen_kart.txt" 
         
-        # 1. YENİ DESTE (Gizli)
+        # 1. YENİ DESTE
         if 'deste' in act or 'hazir' in act or 'karistir' in act or 'create' in act or 'shuffle' in act or 'prepare' in act or 'new' in act:
             deste = [f"{s}{v}" for s in ["♠", "♥", "♦", "♣"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
             random.shuffle(deste)
+            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
+            return {"sonuc": "🪄 52'lik deste karıştırıldı ve yüzü kapalı masaya kondu."}
             
-            with open(dosya_yolu, "w", encoding="utf-8") as f:
-                json.dump(deste, f)
-                
-            return {"sonuc": "🪄 52'lik deste tamamen karıştırıldı ve yüzü kapalı şekilde masaya kondu. Kartların sırasını şu an ben bile bilmiyorum."}
-            
-        # 2. DESTEYİ KESME (Cut)
+        # 2. DESTEYİ KESME
         elif 'kes' in act or 'cut' in act or 'bol' in act or 'split' in act or 'divide' in act:
-            if not os.path.exists(dosya_yolu):
-                return {"hata": "Önce desteyi karıştırman lazım!"}
-                
-            with open(dosya_yolu, "r", encoding="utf-8") as f:
-                deste = json.load(f)
-                
-            # Gemini parametre adını ne uydurursa uydursun, içindeki ilk sayıyı zorla al
+            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
+            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
             kesim_noktasi = 26
             for k, v in params.items():
-                if str(v).isdigit():
-                    kesim_noktasi = int(v)
-                    break
-            
+                if str(v).isdigit(): kesim_noktasi = int(v); break
             yeni_deste = deste[kesim_noktasi:] + deste[:kesim_noktasi]
+            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(yeni_deste, f)
+            return {"sonuc": f"✂️ Deste üstten {kesim_noktasi} kart sayılarak kesildi. Üstteki parça alta alındı."}
             
-            with open(dosya_yolu, "w", encoding="utf-8") as f:
-                json.dump(yeni_deste, f)
-                
-            return {"sonuc": f"✂️ Deste üstten {kesim_noktasi} kart sayılarak kesildi. Üstteki parça alta alındı. Kartlar hala kapalı."}
-            
-        # 3. KARTI GÖSTER (peek, ust, hangi eklendi)
-        elif 'goster' in act or 'soyle' in act or 'reveal' in act or 'bak' in act or 'draw' in act or 'show' in act or 'tell' in act or 'check' in act or 'peek' in act or 'ust' in act or 'hangi' in act or 'top' in act:
-            if not os.path.exists(dosya_yolu):
-                return {"hata": "Masada deste yok!"}
-                
-            with open(dosya_yolu, "r", encoding="utf-8") as f:
-                deste = json.load(f)
-                
-            # Yine parametre adını boşverip doğrudan sayıyı çekiyoruz
+        # 3. KARTI GÖSTER (Sadece bakar, desteyi bozmaz)
+        elif 'goster' in act or 'soyle' in act or 'reveal' in act or 'bak' in act or 'show' in act or 'tell' in act or 'check' in act or 'peek' in act or 'ust' in act or 'hangi' in act or 'top' in act:
+            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
+            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
             sira = 1
             for k, v in params.items():
-                if str(v).isdigit():
-                    sira = int(v)
-                    break
-            
+                if str(v).isdigit(): sira = int(v); break
             sira_index = sira - 1
-            if sira_index < 0 or sira_index >= len(deste):
-                return {"hata": f"Destede {sira}. sıra yok! 1 ile 52 arası bir sayı söyle."}
-                
-            kart = deste[sira_index]
-            return {"sonuc": f"👁️ Gizli desteye bakıldı... Baştan {sira}. sıradaki kart: {kart}"}
+            if sira_index < 0 or sira_index >= len(deste): return {"hata": f"Destede {sira}. sıra yok!"}
+            return {"sonuc": f"👁️ Gizli desteye bakıldı... Baştan {sira}. sıradaki kart: {deste[sira_index]}"}
+
+        # 4. KART SEÇ VE ÇIKAR (Desteden eksiltir!)
+        elif 'sec' in act or 'cikar' in act or 'remove' in act or 'draw' in act or 'pick' in act or 'take' in act or 'ayir' in act:
+            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
+            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
             
+            sira_index = random.randint(0, len(deste)-1)
+            for k, v in params.items():
+                if str(v).isdigit(): sira_index = int(v) - 1; break
+            
+            if sira_index < 0 or sira_index >= len(deste): return {"hata": "Geçersiz sıra!"}
+            secilen = deste.pop(sira_index)
+            
+            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
+            with open(secilen_yolu, "w", encoding="utf-8") as f: f.write(secilen)
+            
+            return {"sonuc": f"🃏 Desteden bir kart çekildi ve ayrıldı (Destede {len(deste)} kart kaldı). Çekilen kart: {secilen}"}
+
+        # 5. AYRILAN KARTI İSTENEN YERE KOY (Insert)
+        elif 'koy' in act or 'yerlestir' in act or 'insert' in act or 'put' in act or 'place' in act or 'sok' in act:
+            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
+            if not os.path.exists(secilen_yolu): return {"hata": "Önce bir kart seçip çıkarmalısın!"}
+            
+            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
+            with open(secilen_yolu, "r", encoding="utf-8") as f: secilen = f.read().strip()
+            
+            hedef_sira = 1 
+            for k, v in params.items():
+                if str(v).isdigit(): hedef_sira = int(v); break
+            
+            deste.insert(hedef_sira - 1, secilen)
+            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
+            os.remove(secilen_yolu) 
+            
+            return {"sonuc": f"📥 Ayrılan kart ({secilen}), gizlice destenin {hedef_sira}. sırasına yerleştirildi. (Deste tekrar {len(deste)} kart)."}
+
+        # 6. DAĞIT (Matematiksel numaralar için kartları tek tek masaya vurarak sırayı tersine çevirme)
+        elif 'dagit' in act or 'deal' in act or 'say' in act or 'count' in act:
+            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
+            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
+            
+            miktar = 10
+            for k, v in params.items():
+                if str(v).isdigit(): miktar = int(v); break
+            
+            if miktar > len(deste): return {"hata": f"Destede sadece {len(deste)} kart var!"}
+            
+            dagitilanlar = deste[:miktar]
+            dagitilanlar.reverse() # Tek tek dağıtıldığı için sıra tersine döner
+            kalanlar = deste[miktar:]
+            
+            yeni_deste = dagitilanlar + kalanlar
+            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(yeni_deste, f)
+            
+            return {"sonuc": f"🎴 Üstten {miktar} kart masaya tek tek dağıtıldı (kartların kendi içindeki sırası tersine döndü) ve destenin üstüne kondu."}
+
         else:
-            return {"hata": f"Anlaşılmayan hamle: {action}. Sadece karıştır, kes veya göster yapabilirim."}
+            return {"hata": f"Anlaşılmayan hamle: {action}. Karıştır, kes, göster, çıkar, koy veya dağıt yapabilirim."}
             
     except Exception as e:
         return {"hata": str(e)}
