@@ -36,8 +36,6 @@ PANO_GÖRSEL_YOLU = "/root/atlas/sistem_panosu.png"
 chroma_client = chromadb.PersistentClient(path="/root/atlas/chroma_bellek")
 koleksiyon = chroma_client.get_or_create_collection(name="atlas_hafiza")
 
-# Gemini Model Adını Değiştiriyoruz: gemini-1.5-flash fonksiyon çağırmayı daha iyi destekler
-# MODEL_NAME = "gemini-3-flash-preview"
 MODEL_NAME = "gemini-3-flash-preview" 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -54,14 +52,7 @@ def sistem_durumu():
     except Exception:
         return 0, 0, 0
 
-# ==============================================================================
-# ================== ATLAS'IN "AGENTIC" ALETLERİ (TOOLS) ==================
-# ==================    Artık Atlas bu araçları kullanabilir.  ==================
-# ==================   Dökümantasyonlar Gemini'nin anlaması içindir.  ==================
-# ==================   DEĞİŞTİRMEYİN. ASYNCHRONOUS DEĞİLDİR.  ==================
-# ==================      FONKSİYONLAR SADECE JSON DÖNDÜRÜR.  ==================
-# ==============================================================================
-
+# --- ATLAS'IN ARAÇLARI ---
 def execute_engineering_calculation(component, calculation_type, parameters_json):
     try:
         params = json.loads(parameters_json)
@@ -86,124 +77,14 @@ def execute_engineering_calculation(component, calculation_type, parameters_json
     except Exception as e:
         return {"hata": str(e)}
 
-def simulate_card_illusion(action, params_json="{}"):
-    try:
-        try:
-            params = json.loads(params_json) if params_json else {}
-        except:
-            params = {}
-            
-        act = str(action).lower().replace('ö', 'o').replace('ü', 'u').replace('ı', 'i').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g')
-        dosya_yolu = "/root/atlas/gizli_deste.json"
-        secilen_yolu = "/root/atlas/secilen_kart.txt" 
-        
-        # 1. YENİ DESTE
-        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'create' in act or 'shuffle' in act or 'prepare' in act or 'new' in act:
-            deste = [f"{s}{v}" for s in ["♠", "♥", "♦", "♣"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
-            random.shuffle(deste)
-            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
-            return {"sonuc": "🪄 52'lik deste karıştırıldı ve yüzü kapalı masaya kondu."}
-            
-        # 2. DESTEYİ KESME
-        elif 'kes' in act or 'cut' in act or 'bol' in act or 'split' in act or 'divide' in act:
-            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
-            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
-            kesim_noktasi = 26
-            for k, v in params.items():
-                if str(v).isdigit(): kesim_noktasi = int(v); break
-            yeni_deste = deste[kesim_noktasi:] + deste[:kesim_noktasi]
-            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(yeni_deste, f)
-            return {"sonuc": f"✂️ Deste üstten {kesim_noktasi} kart sayılarak kesildi. Üstteki parça alta alındı."}
-            
-        # 3. KARTI GÖSTER (Sadece bakar, desteyi bozmaz)
-        elif 'goster' in act or 'soyle' in act or 'reveal' in act or 'bak' in act or 'show' in act or 'tell' in act or 'check' in act or 'peek' in act or 'ust' in act or 'hangi' in act or 'top' in act:
-            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
-            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
-            sira = 1
-            for k, v in params.items():
-                if str(v).isdigit(): sira = int(v); break
-            sira_index = sira - 1
-            if sira_index < 0 or sira_index >= len(deste): return {"hata": f"Destede {sira}. sıra yok!"}
-            return {"sonuc": f"👁️ Gizli desteye bakıldı... Baştan {sira}. sıradaki kart: {deste[sira_index]}"}
-
-        # 4. KART SEÇ VE ÇIKAR (Desteden eksiltir!)
-        elif 'sec' in act or 'cikar' in act or 'remove' in act or 'draw' in act or 'pick' in act or 'take' in act or 'ayir' in act:
-            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
-            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
-            
-            sira_index = random.randint(0, len(deste)-1)
-            for k, v in params.items():
-                if str(v).isdigit(): sira_index = int(v) - 1; break
-            
-            if sira_index < 0 or sira_index >= len(deste): return {"hata": "Geçersiz sıra!"}
-            secilen = deste.pop(sira_index)
-            
-            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
-            with open(secilen_yolu, "w", encoding="utf-8") as f: f.write(secilen)
-            
-            return {"sonuc": f"🃏 Desteden bir kart çekildi ve ayrıldı (Destede {len(deste)} kart kaldı). Çekilen kart: {secilen}"}
-
-        # 5. AYRILAN KARTI İSTENEN YERE KOY (Insert)
-        elif 'koy' in act or 'yerlestir' in act or 'insert' in act or 'put' in act or 'place' in act or 'sok' in act:
-            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
-            if not os.path.exists(secilen_yolu): return {"hata": "Önce bir kart seçip çıkarmalısın!"}
-            
-            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
-            with open(secilen_yolu, "r", encoding="utf-8") as f: secilen = f.read().strip()
-            
-            hedef_sira = 1 
-            for k, v in params.items():
-                if str(v).isdigit(): hedef_sira = int(v); break
-            
-            deste.insert(hedef_sira - 1, secilen)
-            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(deste, f)
-            os.remove(secilen_yolu) 
-            
-            return {"sonuc": f"📥 Ayrılan kart ({secilen}), gizlice destenin {hedef_sira}. sırasına yerleştirildi. (Deste tekrar {len(deste)} kart)."}
-
-        # 6. DAĞIT (Matematiksel numaralar için kartları tek tek masaya vurarak sırayı tersine çevirme)
-        elif 'dagit' in act or 'deal' in act or 'say' in act or 'count' in act:
-            if not os.path.exists(dosya_yolu): return {"hata": "Masada deste yok!"}
-            with open(dosya_yolu, "r", encoding="utf-8") as f: deste = json.load(f)
-            
-            miktar = 10
-            for k, v in params.items():
-                if str(v).isdigit(): miktar = int(v); break
-            
-            if miktar > len(deste): return {"hata": f"Destede sadece {len(deste)} kart var!"}
-            
-            dagitilanlar = deste[:miktar]
-            dagitilanlar.reverse() # Tek tek dağıtıldığı için sıra tersine döner
-            kalanlar = deste[miktar:]
-            
-            yeni_deste = dagitilanlar + kalanlar
-            with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(yeni_deste, f)
-            
-            return {"sonuc": f"🎴 Üstten {miktar} kart masaya tek tek dağıtıldı (kartların kendi içindeki sırası tersine döndü) ve destenin üstüne kondu."}
-
-        else:
-            return {"hata": f"Anlaşılmayan hamle: {action}. Karıştır, kes, göster, çıkar, koy veya dağıt yapabilirim."}
-            
-    except Exception as e:
-        return {"hata": str(e)}
-        
 def create_image_from_text(prompt, style):
-    """Yapay Zeka ile Metinden Görsel Üretir.
-    Prompt: Detaylı görsel açıklaması.
-    Style: 'siberpunk', 'panorama-360', 'realistik- unity'.
-    DÖNÜŞ: Görselin dosya yolu veya URL'si (Simüle edilmiştir, Flask Entegrasyonu Gerektirir).
-    """
-    # Bu fonksiyon şu an gerçek bir AI API'sini tetiklemiyor, simüle ediyor.
-    # Flask entegrasyonu buraya gömülmelidir.
     path = f"/root/atlas/generated_{uuid.uuid4()}.png"
-    # Placeholder: Flask sunucunuza bir webhook atıp görseli buraya çekmelisiniz.
     return {"status": "Görsel üretim isteği Flask stüdyoya gönderildi.", "dosya_yolu": path}
 
-# --- ATLAS'IN AGENTIC BEYNİ VE RAG SİSTEMİ ---
+# --- ATLAS'IN BEYNİ ---
 def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     cpu, ram, disk = sistem_durumu()
     
-    # 1. RAG SİSTEMİ: Vektör hafızadan en alakalı 3 anıyı getir
     uzun_sureli_hafiza = ""
     try:
         if koleksiyon.count() > 0:
@@ -213,7 +94,6 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     except Exception as e:
         uzun_sureli_hafiza = "Hafıza okunamadı."
 
-    # 2. WEB ARAYÜZÜNDEN GELEN AKTİF SEKMEYİ OKU
     aktif_sohbet_metni = ""
     if web_gecmis and len(web_gecmis) > 0:
         aktif_sohbet_metni = "\n--- BU OTURUMDAKİ AKTİF SOHBET ---\n"
@@ -222,14 +102,13 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
             aktif_sohbet_metni += f"{kim}: {msg.get('text')}\n"
         aktif_sohbet_metni += "-----------------------------------\n"
 
-    # 3. GEMINI İÇİN MASTER SİSTEM KOMUTU VE ALETLERİN TANIMLANMASI
     prompt = f"""Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor.
     Sunucu: CPU %{cpu}, RAM %{ram}. 
     
     KURAL 1: ASLA destan yazma. Cevapların çok kısa, net ve sohbet havasında olsun. (Maksimum 2-3 cümle).
     KURAL 2: Alaycılık seviyeni sabit tut; ne aşırıya kaç ne de çok kibar ol. Doğal bir arkadaş gibi takıl.
     KURAL 3: Soru sorulmadıkça uzun açıklamalar yapma, doğrudan sadede gel.
-    KURAL 4: Mühendislik, Fizik, İllüzyon Simülasyonu veya Görsel Üretim istekleri gördüğünde ALETLERİNİ (TOOLS) kullan. Açıklama yapma, önce aracı çalıştır.
+    KURAL 4: Mühendislik, Fizik veya Görsel Üretim istekleri gördüğünde ALETLERİNİ (TOOLS) kullan. Açıklama yapma, önce aracı çalıştır.
     
     --- UZUN SÜRELİ (VEKTÖREL) HAFIZANDAN GELEN ÇAĞRIŞIMLAR ---
     {uzun_sureli_hafiza}
@@ -238,8 +117,6 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     Akif: {kullanici_mesaji}
     Atlas:"""
 
-    # Fonksiyon çağırma yeteneğiyle Gemini'ye paket gönderiliyor
-    # GÖNDERİLİRKEN MODEL_NAME preview takılı gemini-3'tü, preview- takısız gemini-1.5'e çevirdik.
     tools_config = [
         types.Tool(function_declarations=[
             types.FunctionDeclaration(
@@ -250,14 +127,6 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
                     "calculation_type": types.Schema(type=types.Type.STRING, description="Hesaplama türü."),
                     "parameters_json": types.Schema(type=types.Type.STRING, description="Gerekli parametreler JSON.")
                 }, required=["component", "calculation_type", "parameters_json"])
-            ),
-            types.FunctionDeclaration(
-                name="simulate_card_illusion",
-                description="Deste, kes, dağıt gibi sanal illüzyon simülasyonu yapar.",
-                parameters=types.Schema(type=types.Type.OBJECT, properties={
-                    "action": types.Schema(type=types.Type.STRING, description="Eylem."),
-                    "params_json": types.Schema(type=types.Type.STRING, description="Gerekli parametreler JSON.")
-                }, required=["action", "params_json"])
             ),
              types.FunctionDeclaration(
                 name="create_image_from_text",
@@ -273,28 +142,20 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     try:
         response = client.models.generate_content(model=MODEL_NAME, contents=prompt, config=types.GenerateContentConfig(tools=tools_config))
         
-        # 4. AGENTIC DÖNGÜ: Gemini fonksiyon çağırma isteği gönderdi mi?
         for part in response.candidates[0].content.parts:
             if part.function_call:
                 function_name = part.function_call.name
-                # args = part.function_call.args
-                # part.function_call.args bir sözlüktür, json stringi değildir.
-                # json.dumps() ile JSON dizesine dönüştürmeliyiz.
                 args_json = json.dumps(part.function_call.args)
                 
                 tool_cevap = {}
                 if function_name == "execute_engineering_calculation":
                     tool_cevap = execute_engineering_calculation(**part.function_call.args)
-                elif function_name == "simulate_card_illusion":
-                    tool_cevap = simulate_card_illusion(**part.function_call.args)
                 elif function_name == "create_image_from_text":
                     tool_cevap = create_image_from_text(**part.function_call.args)
                 
-               # Aracı kullandığını hafızaya al
                 kayit = f"Akif: (Araç Kullandı) {function_name} -> {args_json} | Atlas: {json.dumps(tool_cevap)}"
                 koleksiyon.add(documents=[kayit], ids=[str(uuid.uuid4())])
                 
-                # JSON YERİNE OKUNABİLİR METİN DÖNDÜR
                 if "sonuc" in tool_cevap:
                     return f"⚙️ **Sistem Hesaplaması:** {tool_cevap['sonuc']}"
                 elif "status" in tool_cevap:
@@ -302,17 +163,14 @@ def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
                 else:
                     return f"🚨 **Araç Hatası:** {tool_cevap.get('hata', 'Bilinmeyen hata.')}"
                 
-        # Fonksiyon çağrılmadıysa, normal metin cevabını döndür
         cevap = response.text.strip()
-        
-        # Hafızaya kaydet
         koleksiyon.add(documents=[f"Akif: {kullanici_mesaji} | Atlas: {cevap}"], ids=[str(uuid.uuid4())])
         return cevap
         
     except Exception as e:
         return f"Hata: {str(e)}"
 
-# --- WEB API MODÜLÜ (Değiştirilmedi) ---
+# --- WEB API MODÜLÜ ---
 async def api_durum(request):
     cpu, ram, disk = sistem_durumu()
     return web.json_response({"cpu": cpu, "ram": ram, "disk": disk})
@@ -335,9 +193,6 @@ async def api_komut(request):
     return web.json_response({"cevap": cevap})
 
 # --- TELEGRAM MODÜLLERİ ---
-# Pano ve multimedia fonksiyonlarını da çok kısa cevap verecek şekilde master prompt ile güncelledik.
-# ... (Diğer fonksiyonlar değiştirilmeden kodun geri kalanı aynen kalır)
-
 async def pano_grafigi_ciz(cpu, ram, disk):
     global cpu_gecmis, ram_gecmis
     cpu_gecmis.pop(0); cpu_gecmis.append(cpu)
