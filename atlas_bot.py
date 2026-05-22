@@ -13,7 +13,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# Web API için gerekli kütüphaneler
 from aiohttp import web
 import aiohttp_cors
 import asyncio
@@ -40,16 +39,35 @@ def sistem_durumu():
     disk = psutil.disk_usage('/').percent
     return cpu, ram, disk
 
-def beyin_firtinasi(kullanici_mesaji, kaynak="Web"):
+def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     cpu, ram, disk = sistem_durumu()
-    gecmis = hafizayi_oku()
-    prompt = f"Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor. Sunucu: CPU %{cpu}, RAM %{ram}. Geçmiş: {gecmis}\nAkif: {kullanici_mesaji}\nAtlas:"
-    response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
+    genel_gecmis = hafizayi_oku()
+    
+    # Web arayüzünden gelen aktif sohbet paketini ayrıştır
+    aktif_sohbet_metni = ""
+    if web_gecmis and len(web_gecmis) > 0:
+        aktif_sohbet_metni = "\n--- BU OTURUMDAKİ AKTİF SOHBET ---\n"
+        for msg in web_gecmis:
+            kim = "Akif" if msg.get("role") == "user" else "Atlas"
+            aktif_sohbet_metni += f"{kim}: {msg.get('text')}\n"
+        aktif_sohbet_metni += "-----------------------------------\n"
+
+    prompt = f"""Senin adın Atlas. Zeki, hafif alaycı ama Akif'e sadık bir dijital varlıksın. Şu an {kaynak} arayüzünden konuşuluyor. 
+    Sunucu: CPU %{cpu}, RAM %{ram}. 
+    Genel Geçmiş (Kalıcı Dosya): {genel_gecmis}
+    {aktif_sohbet_metni}
+    Akif: {kullanici_mesaji}
+    Atlas:"""
+    
+    response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
     cevap = response.text.strip()
-    with open(HAFIZA_DOSYASI, "a") as f: f.write(f"[{kaynak}] Akif: {kullanici_mesaji}\nAtlas: {cevap}\n")
+    
+    with open(HAFIZA_DOSYASI, "a") as f: 
+        f.write(f"[{kaynak}] Akif: {kullanici_mesaji}\nAtlas: {cevap}\n")
+        
     return cevap
 
-# --- WEB API (ARKA UÇ) MODÜLÜ ---
+# --- WEB API MODÜLÜ ---
 async def api_durum(request):
     cpu, ram, disk = sistem_durumu()
     return web.json_response({"cpu": cpu, "ram": ram, "disk": disk})
@@ -57,6 +75,7 @@ async def api_durum(request):
 async def api_komut(request):
     data = await request.json()
     mesaj = data.get("komut", "")
+    gecmis = data.get("gecmis", []) # Tarayıcıdan gelen sohbet paketini al
     
     if mesaj.startswith("sudo-atlas "):
         komut = mesaj.replace("sudo-atlas ", "")
@@ -67,11 +86,11 @@ async def api_komut(request):
         except Exception as e:
             return web.json_response({"cevap": f"Hata: {str(e)}"})
             
-    # Sudo komutu değilse yapay zekaya (Gemini'ye) sor
-    cevap = beyin_firtinasi(mesaj, kaynak="Web")
+    # Aktif sohbet geçmişi ile birlikte Gemini'ye yolla
+    cevap = beyin_firtinasi(mesaj, kaynak="Web", web_gecmis=gecmis)
     return web.json_response({"cevap": cevap})
 
-# --- TELEGRAM MODÜLÜ ---
+# --- TELEGRAM VE DİĞER MODÜLLER ---
 def pano_grafigi_ciz(cpu, ram, disk):
     global cpu_gecmis, ram_gecmis
     cpu_gecmis.pop(0); cpu_gecmis.append(cpu)
@@ -109,7 +128,7 @@ async def otonom_inisiyatif_görevi(context: ContextTypes.DEFAULT_TYPE):
     su_an = datetime.now().strftime("%H:%M")
     prompt = f"Sen Atlas'sın. Otonom bir asistan. Şu an saat {su_an}. CPU: %{cpu}, RAM: %{ram}. Akif'e kendi isteğinle bir mesaj yaz. Konu Unity projeleri, Piranha motorlu go-kart veya sunucu durumu olabilir. Doğal, karakterine uygun (alaycı ama sadık) bir giriş yap. Geçmiş: {hafizayi_oku()}\nAtlas'ın Otonom Mesajı:"
     try:
-        response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
+        response = client.models.generate_content(model='gemini-3-flash', contents=prompt)
         cevap = response.text.strip()
         with open(HAFIZA_DOSYASI, "a") as f: f.write(f"[Otonom] Atlas: {cevap}\n")
         await context.bot.send_message(chat_id=int(MY_CHAT_ID), text=cevap)
@@ -138,7 +157,7 @@ async def handle_multimedia(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             yuklenen_medya = client.files.upload(file=gecici_yol)
             prompt = f"Sen Atlas'sın, Akif'in asistanısın. Gönderilen medya talimatı: {talimat}"
-            response = client.models.generate_content(model='gemini-3-flash-preview', contents=[yuklenen_medya, prompt])
+            response = client.models.generate_content(model='gemini-3-flash', contents=[yuklenen_medya, prompt])
             await mesaj.reply_text(response.text.strip())
         except Exception as e: await mesaj.reply_text(f"🚨 Hata: {e}")
         finally:
@@ -156,21 +175,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cevap = beyin_firtinasi(kullanici_mesaji, kaynak="Telegram")
     await update.message.reply_text(cevap)
 
-# --- ANA TETİKLEYİCİ (İKİ MOTORU BİRDEN ÇALIŞTIRAN YAPI) ---
 async def main():
-    # 1. Web Sunucusunu Kur
     app = web.Application()
+    cors = aiohttp_cors.setup(app, defaults={"*": aiohttp_cors.ResourceOptions(allow_credentials=True, expose_headers="*", allow_headers="*")})
     
-    # CORS ayarları (Senin kendi web sitenin VDS'e veri sormasına izin verir)
-    cors = aiohttp_cors.setup(app, defaults={
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=True,
-            expose_headers="*",
-            allow_headers="*",
-        )
-    })
-    
-    # Rotaları ekle
     durum_resource = app.router.add_resource("/api/durum")
     cors.add(durum_resource.add_route("GET", api_durum))
     komut_resource = app.router.add_resource("/api/komut")
@@ -178,11 +186,9 @@ async def main():
     
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080) # Atlas 8080 portundan webi dinliyor
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
-    print("🌐 Atlas Web API Aktif! (Port: 8080)")
 
-    # 2. Telegram Motorunu Kur
     tg_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     tg_app.job_queue.run_repeating(otonom_inisiyatif_görevi, interval=7200, first=30)
     tg_app.add_handler(CommandHandler("panel", pano_komutu))
@@ -192,9 +198,7 @@ async def main():
     await tg_app.initialize()
     await tg_app.start()
     await tg_app.updater.start_polling()
-    print("🤖 Atlas Telegram Motoru Aktif!")
 
-    # Sonsuz döngü (Kapanmasını engeller)
     while True:
         await asyncio.sleep(3600)
 
