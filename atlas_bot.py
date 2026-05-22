@@ -96,29 +96,28 @@ def simulate_card_illusion(action, params_json="{}"):
         act = str(action).lower()
         dosya_yolu = "/root/atlas/gizli_deste.json"
         
-        # 1. YENİ DESTE VE KARIŞTIRMA (Gizli)
-        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'create' in act or 'shuffle' in act:
+        # 1. YENİ DESTE (Gizli)
+        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'create' in act or 'shuffle' in act or 'prepare' in act:
             deste = [f"{s}{v}" for s in ["♠", "♥", "♦", "♣"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
             random.shuffle(deste)
             
-            # Desteyi arka planda diske yazıyoruz, ekrana basmıyoruz!
             with open(dosya_yolu, "w", encoding="utf-8") as f:
                 json.dump(deste, f)
                 
-            return {"sonuc": "🪄 52'lik deste tamamen karıştırıldı ve yüzü kapalı şekilde masaya kondu. Kartların sırasını şu an ben bile bilmiyorum. Ne yapmamı istersin? (Örn: Desteyi ortadan kes)"}
+            return {"sonuc": "🪄 52'lik deste tamamen karıştırıldı ve yüzü kapalı şekilde masaya kondu. Kartların sırasını şu an ben bile bilmiyorum."}
             
-        # 2. DESTEYİ KESME (Cut)
-        elif 'kes' in act or 'cut' in act or 'bol' in act:
+        # 2. DESTEYİ KESME (Cut) - Parametreleri İngilizce/Türkçe yakalama
+        elif 'kes' in act or 'cut' in act or 'bol' in act or 'split' in act:
             if not os.path.exists(dosya_yolu):
                 return {"hata": "Önce desteyi karıştırman lazım!"}
                 
             with open(dosya_yolu, "r", encoding="utf-8") as f:
                 deste = json.load(f)
                 
-            # Kaçıncı karttan kesileceği belirtilmemişse ortadan (26) keser
-            kesim_noktasi = int(params.get('sayi', params.get('miktar', len(deste)//2)))
+            # Gemini 'amount', 'count', 'index' gibi ne yollarsa yakala. Bulamazsa 26.
+            kesim_noktasi = params.get('sayi', params.get('miktar', params.get('amount', params.get('count', params.get('index', len(deste)//2)))))
+            kesim_noktasi = int(kesim_noktasi)
             
-            # Desteyi kes ve üsttekileri alta koy
             yeni_deste = deste[kesim_noktasi:] + deste[:kesim_noktasi]
             
             with open(dosya_yolu, "w", encoding="utf-8") as f:
@@ -126,30 +125,28 @@ def simulate_card_illusion(action, params_json="{}"):
                 
             return {"sonuc": f"✂️ Deste üstten {kesim_noktasi} kart sayılarak kesildi. Üstteki parça alta alındı. Kartlar hala kapalı."}
             
-        # 3. KARTI GÖSTER (Reveal)
-        elif 'goster' in act or 'soyle' in act or 'reveal' in act or 'bak' in act or 'kacinci' in act:
+        # 3. KARTI GÖSTER (Reveal) - draw ve show kelimeleri eklendi
+        elif 'goster' in act or 'soyle' in act or 'reveal' in act or 'bak' in act or 'draw' in act or 'show' in act or 'tell' in act or 'check' in act:
             if not os.path.exists(dosya_yolu):
                 return {"hata": "Masada deste yok!"}
                 
             with open(dosya_yolu, "r", encoding="utf-8") as f:
                 deste = json.load(f)
                 
-            # Kullanıcı "1. kart" derse Python'da index 0 olduğu için -1 yapıyoruz
-            sira = int(params.get('sira', params.get('sayi', 1)))
-            sira_index = sira - 1
+            sira = params.get('sira', params.get('sayi', params.get('position', params.get('index', params.get('number', 1)))))
+            sira_index = int(sira) - 1
             
             if sira_index < 0 or sira_index >= len(deste):
-                return {"hata": f"Destede {sira}. sıra yok! 1 ile 52 arası bir sayı söyle."}
+                return {"hata": f"Destede {int(sira)}. sıra yok! 1 ile 52 arası bir sayı söyle."}
                 
             kart = deste[sira_index]
-            return {"sonuc": f"👁️ Gizli desteye bakıldı... Baştan {sira}. sıradaki kart: {kart}"}
+            return {"sonuc": f"👁️ Gizli desteye bakıldı... Baştan {int(sira)}. sıradaki kart: {kart}"}
             
         else:
             return {"hata": f"Anlaşılmayan hamle: {action}. Sadece karıştır, kes veya göster yapabilirim."}
             
     except Exception as e:
         return {"hata": str(e)}
-
 def create_image_from_text(prompt, style):
     """Yapay Zeka ile Metinden Görsel Üretir.
     Prompt: Detaylı görsel açıklaması.
