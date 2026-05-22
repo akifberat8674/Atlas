@@ -88,7 +88,6 @@ def execute_engineering_calculation(component, calculation_type, parameters_json
 
 def simulate_card_illusion(action, params_json="{}"):
     try:
-        # JSON parametreleri bazen boş veya hatalı gelebilir, güvenli okuyalım
         try:
             params = json.loads(params_json) if params_json else {}
         except:
@@ -96,10 +95,9 @@ def simulate_card_illusion(action, params_json="{}"):
             
         act = str(action).lower()
         
-        # Eylem adını esnek yakala
-        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'ill' in act:
+        # Gemini'nin İngilizce (create, shuffle) uydurma ihtimallerini de kapsıyoruz
+        if 'deste' in act or 'hazir' in act or 'karistir' in act or 'ill' in act or 'create' in act or 'shuffle' in act or 'prepare' in act:
             renk = params.get('renk', 'mavi')
-            # Şekilli kart destesi oluştur
             deste = [f"{s}{v}" for s in ["♠", "♥", "♦", "♣"] for v in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]]
             random.shuffle(deste)
             
