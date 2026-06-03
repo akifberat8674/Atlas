@@ -35,11 +35,10 @@ MY_CHAT_ID = os.getenv("MY_CHAT_ID")
 PANO_GÖRSEL_YOLU = "/root/atlas/sistem_panosu.png"
 
 # --- OPENROUTER (SANSÜRSÜZ DIŞ BEYİN) AYARLARI ---
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# Eğer .env içinde model yazmıyorsa çökmemesi için varsayılan olarak zephyr-free atadık
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "huggingfaceh4/zephyr-7b-beta:free") 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-# Dünyanın en iyi Türkçe bilen, zeki ve sansürsüz (Uncensored) modellerinden biri:
-OPENROUTER_MODEL = "cognitivecomputations/dolphin-mixtral-8x7b"
 
 # --- CHROMA VEKTÖR HAFIZASI ---
 chroma_client = chromadb.PersistentClient(path="/root/atlas/chroma_bellek")
