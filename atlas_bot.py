@@ -34,11 +34,10 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 MY_CHAT_ID = os.getenv("MY_CHAT_ID")
 PANO_GÖRSEL_YOLU = "/root/atlas/sistem_panosu.png"
 
-# --- OPENROUTER (SANSÜRSÜZ DIŞ BEYİN) AYARLARI ---
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-# Eğer .env içinde model yazmıyorsa çökmemesi için varsayılan olarak zephyr-free atadık
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "huggingfaceh4/zephyr-7b-beta:free") 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# --- GROQ (IŞIK HIZINDA DIŞ BEYİN) AYARLARI ---
+OPENROUTER_API_KEY = os.getenv("GROQ_API_KEY")
+OPENROUTER_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant") 
+OPENROUTER_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # --- CHROMA VEKTÖR HAFIZASI ---
 chroma_client = chromadb.PersistentClient(path="/root/atlas/chroma_bellek")
