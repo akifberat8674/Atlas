@@ -132,7 +132,7 @@ async def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(OLLAMA_URL, json=payload, timeout=60) as response:
+            async with session.post(OLLAMA_URL, json=payload, timeout=300) as response:
                 if response.status == 200:
                     data = await response.json()
                     cevap = data.get("response", "").strip()
