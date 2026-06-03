@@ -34,9 +34,12 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 MY_CHAT_ID = os.getenv("MY_CHAT_ID")
 PANO_GÖRSEL_YOLU = "/root/atlas/sistem_panosu.png"
 
-# --- YEREL BEYİN (OLLAMA) AYARLARI ---
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-OLLAMA_MODEL = "dolphin-phi"
+# --- OPENROUTER (SANSÜRSÜZ DIŞ BEYİN) AYARLARI ---
+OPENROUTER_API_KEY = "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"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Dünyanın en iyi Türkçe bilen, zeki ve sansürsüz (Uncensored) modellerinden biri:
+OPENROUTER_MODEL = "cognitivecomputations/dolphin-mixtral-8x7b"
 
 # --- CHROMA VEKTÖR HAFIZASI ---
 chroma_client = chromadb.PersistentClient(path="/root/atlas/chroma_bellek")
@@ -126,30 +129,32 @@ async def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
     messages.append({"role": "user", "content": kullanici_mesaji})
 
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": OPENROUTER_MODEL,
         "messages": messages,
-        "stream": False,
-        "options": {
-            "num_ctx": 1024,
-            "num_predict": 100,  # Cevap uzunluğunu iyice kıstık, destan yazamaz.
-            "temperature": 0.3   # Yaratıcılığı düşürdük ki halüsinasyon görüp İngilizce özet çıkarmasın.
-        }
+        "temperature": 0.5
+    }
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://akifberat.com.tr", # OpenRouter bunu zorunlu tutar
+        "Content-Type": "application/json"
     }
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(OLLAMA_URL, json=payload, timeout=300) as response:
+            # Dış sunucuya bağlandığımız için 15-20 saniye yeterli olacaktır, timeout'u düşürdük
+            async with session.post(OPENROUTER_URL, headers=headers, json=payload, timeout=30) as response:
                 if response.status == 200:
                     data = await response.json()
-                    # Generate yerine Chat kullandığımız için cevabın yeri değişti:
-                    cevap = data.get("message", {}).get("content", "").strip()
+                    cevap = data['choices'][0]['message']['content'].strip()
                     
                     koleksiyon.add(documents=[f"Akif: {kullanici_mesaji} | Atlas: {cevap}"], ids=[str(uuid.uuid4())])
                     return cevap
                 else:
-                    return f"🚨 [API HATASI] HTTP {response.status}"
+                    hata_detay = await response.text()
+                    return f"🚨 [Dış API Hatası] HTTP {response.status}: {hata_detay}"
     except Exception as e:
-        return f"🚨 [SİSTEM ÇÖKTÜ] Yerel modele ulaşılamıyor: {str(e)}"
+        return f"🚨 [SİSTEM ÇÖKTÜ] Dış beyne ulaşılamıyor: {str(e)}"
 
 # --- WEB API MODÜLÜ ---
 async def api_durum(request):
