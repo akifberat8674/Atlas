@@ -127,7 +127,12 @@ async def beyin_firtinasi(kullanici_mesaji, kaynak="Web", web_gecmis=None):
         "model": OLLAMA_MODEL,
         "prompt": ana_mesaj,
         "system": system_prompt,
-        "stream": False
+        "stream": False,
+        "options": {
+            "num_ctx": 1024,      # Maksimum okuyabileceği kelime hafızasını sınırlar (CPU'yu kurtarır)
+            "num_predict": 150,   # Maksimum vereceği cevap uzunluğu (Sonsuz döngüye girmesini engeller)
+            "temperature": 0.7    # Halüsinasyon görmemesi için yaratıcılığı dengeler
+        }
     }
 
     try:
